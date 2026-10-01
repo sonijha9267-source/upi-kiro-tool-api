@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UPI VIP Pro - Payment Gateway & API Tool</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 2rem 1rem; min-height: 100vh; }
+    
+    .container { max-width: 1000px; margin: 0 auto; }
+    header { text-align: center; margin-bottom: 2.5rem; }
+    header h1 { font-size: 2.25rem; font-weight: 800; color: #fff; margin-bottom: 0.5rem; }
+    header p { color: var(--muted); }
+
+    .grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+    @media (min-width: 768px) { .grid { grid-template-columns: 1fr 1fr; } }
+
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+    .card-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: #fff; }
+
+    .form-group { margin-bottom: 1rem; }
+    label { display: block; font-size: 0.875rem; color: var(--muted); margin-bottom: 0.35rem; }
+    input, select {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.95rem;
+    }
+    input:focus, select:focus { outline: 2px solid var(--accent); }
+
+    .btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: var(--accent-hover); }
+
+    #qrcode { display: flex; justify-content: center; margin: 1.5rem 0; padding: 1rem; background: #fff; border-radius: 8px; width: fit-content; margin-left: auto; margin-right: auto; }
+
+    .apps-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-top: 1rem; }
+    .app-btn {
+      display: inline-block;
+      text-align: center;
+      padding: 0.6rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+    .app-btn:hover { border-color: var(--accent); }
+
+    pre { background: var(--bg); padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; color: #38bdf8; border: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>UPI VIP Pro Gateway</h1>
+      <p>Dynamic UPI QR Code Generator & Intent Link Builder</p>
+    </header>
+
+    <div class="grid">
+      <!-- Input Panel -->
+      <div class="card">
+        <h2 class="card-title">Payment Details</h2>
+        <div class="form-group">
+          <label>VPA / UPI ID</label>
+          <input type="text" id="upiId" value="merchant@upi" placeholder="e.g. merchant@upi">
+        </div>
+        <div class="form-group">
+          <label>Payee Name</label>
+          <input type="text" id="payeeName" value="VIP Pro Store" placeholder="Merchant Name">
+        </div>
+        <div class="form-group">
+          <label>Amount (₹)</label>
+          <input type="number" id="amount" value="100.00" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Transaction Note / Ref</label>
+          <input type="text" id="note" value="Order #1042" placeholder="Note">
+        </div>
+        <button class="btn" onclick="generateUPI()">Generate Payment Link & QR</button>
+      </div>
+
+      <!-- Preview Panel -->
+      <div class="card">
+        <h2 class="card-title">Live Preview & QR</h2>
+        <div id="qrcode"></div>
+        
+        <label>Direct App Launch (Mobile):</label>
+        <div class="apps-grid">
+          <a id="gpayBtn" href="#" class="app-btn">Google Pay</a>
+          <a id="phonepeBtn" href="#" class="app-btn">PhonePe</a>
+          <a id="paytmBtn" href="#" class="app-btn">Paytm</a>
+          <a id="bhimBtn" href="#" class="app-btn">BHIM UPI</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- API Output Panel -->
+    <div class="card" style="margin-top: 1.5rem;">
+      <h2 class="card-title">Generated Raw UPI URI</h2>
+      <pre id="uriOutput">upi://pay?pa=merchant@upi&pn=VIP%20Pro%20Store&am=100.00&tn=Order%20%231042&cu=INR</pre>
+    </div>
+  </div>
+
+  <script>
+    let qrcodeObj = null;
+
+    function generateUPI() {
+      const vpa = document.getElementById('upiId').value.trim();
+      const name = document.getElementById('payeeName').value.trim();
+      const amount = document.getElementById('amount').value.trim();
+      const note = document.getElementById('note').value.trim();
+
+      if (!vpa || !name) {
+        alert("Please enter both a valid UPI ID and Payee Name.");
+        return;
+      }
+
+      // Build standard UPI URI string
+      const upiUri = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(name)}&am=${encodeURIComponent(amount)}&tn=${encodeURIComponent(note)}&cu=INR`;
+
+      // Update output display
+      document.getElementById('uriOutput').innerText = upiUri;
+
+      // Generate QR Code
+      const qrContainer = document.getElementById('qrcode');
+      qrContainer.innerHTML = "";
+      qrcodeObj = new QRCode(qrContainer, {
+        text: upiUri,
+        width: 160,
+        height: 160
+      });
+
+      // Update Deep Links for Mobile Apps
+      document.getElementById('gpayBtn').href = upiUri;
+      document.getElementById('phonepeBtn').href = upiUri;
+      document.getElementById('paytmBtn').href = upiUri;
+      document.getElementById('bhimBtn').href = upiUri;
+    }
+
+    // Initialize on load
+    window.onload = generateUPI;
+  </script>
+</body>
+</html>
